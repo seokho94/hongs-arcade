@@ -23,6 +23,12 @@ importers:
       '@mg/game-sdk':
         specifier: workspace:*
         version: link:../game-sdk
+      '@mg/hammer-smash':
+        specifier: workspace:*
+        version: link:../games/hammer-smash
+      '@mg/mash-race':
+        specifier: workspace:*
+        version: link:../games/mash-race
       '@mg/nunchi':
         specifier: workspace:*
         version: link:../games/nunchi
@@ -50,6 +56,24 @@ importers:
         version: link:../shared
 
   packages/games/catch-mind:
+    dependencies:
+      '@mg/game-sdk':
+        specifier: workspace:*
+        version: link:../../game-sdk
+      '@mg/shared':
+        specifier: workspace:*
+        version: link:../../shared
+
+  packages/games/hammer-smash:
+    dependencies:
+      '@mg/game-sdk':
+        specifier: workspace:*
+        version: link:../../game-sdk
+      '@mg/shared':
+        specifier: workspace:*
+        version: link:../../shared
+
+  packages/games/mash-race:
     dependencies:
       '@mg/game-sdk':
         specifier: workspace:*
@@ -93,6 +117,12 @@ importers:
       '@mg/game-sdk':
         specifier: workspace:*
         version: link:../game-sdk
+      '@mg/hammer-smash':
+        specifier: workspace:*
+        version: link:../games/hammer-smash
+      '@mg/mash-race':
+        specifier: workspace:*
+        version: link:../games/mash-race
       '@mg/nunchi':
         specifier: workspace:*
         version: link:../games/nunchi

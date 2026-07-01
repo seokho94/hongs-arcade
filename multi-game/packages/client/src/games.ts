@@ -4,12 +4,16 @@ import catchMind from '@mg/catch-mind/client';
 import nunchi from '@mg/nunchi/client';
 import speedQuiz from '@mg/speed-quiz/client';
 import omok from '@mg/omok/client';
+import hammerSmash from '@mg/hammer-smash/client';
+import mashRace from '@mg/mash-race/client';
 
 export const clientRegistry: Record<string, GameClientModule> = {
   [catchMind.meta.id]: catchMind,
   [nunchi.meta.id]: nunchi,
   [speedQuiz.meta.id]: speedQuiz,
   [omok.meta.id]: omok,
+  [hammerSmash.meta.id]: hammerSmash,
+  [mashRace.meta.id]: mashRace,
 };
 
 export function getClientGame(id: string): GameClientModule | undefined {

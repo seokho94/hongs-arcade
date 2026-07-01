@@ -12,6 +12,8 @@
     "@mg/nunchi": "workspace:*",
     "@mg/speed-quiz": "workspace:*",
     "@mg/omok": "workspace:*",
+    "@mg/hammer-smash": "workspace:*",
+    "@mg/mash-race": "workspace:*",
     "@mg/game-sdk": "workspace:*",
     "@mg/shared": "workspace:*",
     "socket.io": "^4.8.1"
