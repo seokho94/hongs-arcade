@@ -29,6 +29,9 @@ importers:
       '@mg/shared':
         specifier: workspace:*
         version: link:../shared
+      '@mg/speed-quiz':
+        specifier: workspace:*
+        version: link:../games/speed-quiz
       socket.io-client:
         specifier: ^4.8.1
         version: 4.8.3
@@ -61,6 +64,15 @@ importers:
         specifier: workspace:*
         version: link:../../shared
 
+  packages/games/speed-quiz:
+    dependencies:
+      '@mg/game-sdk':
+        specifier: workspace:*
+        version: link:../../game-sdk
+      '@mg/shared':
+        specifier: workspace:*
+        version: link:../../shared
+
   packages/server:
     dependencies:
       '@mg/catch-mind':
@@ -75,6 +87,9 @@ importers:
       '@mg/shared':
         specifier: workspace:*
         version: link:../shared
+      '@mg/speed-quiz':
+        specifier: workspace:*
+        version: link:../games/speed-quiz
       socket.io:
         specifier: ^4.8.1
         version: 4.8.3

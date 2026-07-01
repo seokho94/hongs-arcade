@@ -256,16 +256,30 @@ function scrollChat(): void {
   const el = document.getElementById('chatlog');
   if (el) el.scrollTop = el.scrollHeight;
 }
+function ordinal(n: number): string {
+  return n === 1 ? '1ST' : n === 2 ? '2ND' : n === 3 ? '3RD' : `${n}TH`;
+}
+function medal(n: number): string {
+  return n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : '';
+}
 function renderResult(result: GameResult): string {
+  const rows = result.rankings
+    .map(
+      (r) => `
+      <div class="ro-rank r${r.rank}">
+        <span class="ro-pos">${medal(r.rank)} ${ordinal(r.rank)}</span>
+        <span class="ro-name">${esc(r.nickname)}</span>
+        <span class="ro-score">${String(r.score).padStart(5, '0')}</span>
+      </div>`,
+    )
+    .join('');
+  const champ = result.rankings.find((r) => r.rank === 1);
   return `
-    <div class="result-overlay">
-      <h2>🏆 게임 결과</h2>
-      ${result.rankings
-        .map(
-          (r) =>
-            `<div class="rank"><span>${r.rank}위 — ${esc(r.nickname)}</span><strong>${r.score}점</strong></div>`,
-        )
-        .join('')}
+    <div class="result-overlay crt-on">
+      <div class="ro-title">GAME OVER</div>
+      <div class="ro-sub">— HI-SCORE —</div>
+      <div class="ro-list">${rows}</div>
+      ${champ ? `<div class="ro-champ">★ CHAMPION ★ ${esc(champ.nickname)}</div>` : ''}
     </div>`;
 }
 
@@ -281,7 +295,7 @@ function enterGame(gameId: string, gameName: string): void {
   app.innerHTML = `
     <div class="row"><h1 style="margin:0">${esc(gameName)}</h1><div class="spacer"></div>
       <button class="danger ghost" id="gleave">나가기</button></div>
-    <div class="card"><div id="game-mount"></div></div>`;
+    <div class="card crt-on"><div id="game-mount"></div></div>`;
   app.querySelector('#gleave')!.addEventListener('click', () => {
     socket.emit(EV.ROOM_LEAVE);
     teardownGame();

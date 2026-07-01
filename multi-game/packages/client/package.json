@@ -11,6 +11,7 @@
   "dependencies": {
     "@mg/catch-mind": "workspace:*",
     "@mg/nunchi": "workspace:*",
+    "@mg/speed-quiz": "workspace:*",
     "@mg/game-sdk": "workspace:*",
     "@mg/shared": "workspace:*",
     "socket.io-client": "^4.8.1"

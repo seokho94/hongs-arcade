@@ -3,8 +3,9 @@ import type { GameModule } from '@mg/game-sdk';
 import type { GameMeta } from '@mg/shared';
 import catchMind from '@mg/catch-mind/server';
 import nunchi from '@mg/nunchi/server';
+import speedQuiz from '@mg/speed-quiz/server';
 
-export const registry: GameModule[] = [catchMind, nunchi];
+export const registry: GameModule[] = [catchMind, nunchi, speedQuiz];
 
 export function getGame(id: string): GameModule | undefined {
   return registry.find((g) => g.meta.id === id);
