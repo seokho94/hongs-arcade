@@ -122,8 +122,8 @@ function renderLobby(): void {
             (g) => `
           <div class="game-card">
             <strong>${esc(g.name)}</strong>
-            <span class="muted">${esc(g.description ?? '')}</span>
-            <span class="muted">${g.minPlayers}~${g.maxPlayers}명</span>
+            <span class="desc">${esc(g.description ?? '')}</span>
+            <span class="players">${g.minPlayers}~${g.maxPlayers}명</span>
             <button data-create="${g.id}">방 만들기</button>
           </div>`,
           )

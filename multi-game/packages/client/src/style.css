@@ -169,14 +169,26 @@ input[type="text"]::placeholder { color: #5b5b8a; }
   flex: 1 1 240px;
   background: rgba(8, 8, 28, 0.55);
   border: 2px solid var(--line); border-radius: 10px; padding: 16px;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 8px;
   transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 }
 .game-card:hover {
   border-color: var(--magenta); transform: translateY(-3px);
   box-shadow: 0 0 20px rgba(255, 46, 151, 0.3);
 }
-.game-card strong { font-family: var(--pixel); font-size: 12px; color: var(--cyan); text-shadow: 0 0 8px rgba(0, 234, 255, 0.5); line-height: 1.5; }
+.game-card strong {
+  font-family: var(--pixel); font-size: 12px; color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 234, 255, 0.5); line-height: 1.5; min-height: 1.5em;
+}
+/* 설명 영역을 3줄로 고정 → 카드 높이 균일, 길면 말줄임 */
+.game-card .desc {
+  color: var(--muted); font-size: 13px; line-height: 1.5;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  overflow: hidden; min-height: calc(1.5em * 3);
+}
+.game-card .players { color: var(--muted); font-size: 12px; }
+/* 버튼을 항상 카드 하단에 정렬 */
+.game-card button { margin-top: auto; }
 
 .chat-log {
   height: 200px; overflow-y: auto;
