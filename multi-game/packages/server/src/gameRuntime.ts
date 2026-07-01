@@ -1,4 +1,5 @@
-/** GameInstance <-> 소켓 전송을 잇는 어댑터. 게임은 이 런타임이 주는 GameContext로만 통신한다. */
+/** GameInstance <-> 소켓 전송을 잇는 어댑터. 게임은 이 런타임이 주는 GameContext로만 통신한다.
+ *  게임 코드의 모든 진입점을 try/catch로 감싸 한 게임의 예외가 서버 프로세스를 죽이지 않게 한다. */
 import type { GameContext, GameInstance, GameModule } from '@mg/game-sdk';
 import type { GameResult, Player } from '@mg/shared';
 
@@ -27,18 +28,21 @@ export class GameRuntime {
     private readonly onEnd: (result: GameResult) => void,
   ) {
     const self = this;
+    const pushOne = (id: string) => {
+      try {
+        self.transport.pushState(id, self.instance.getStateView(id));
+      } catch (e) {
+        // 한 뷰어의 getStateView 오류가 게임 전체를 막지 않도록 개별 격리
+        console.error(`[game:${self.module.meta.id}] getStateView(${id}) 예외:`, e);
+      }
+    };
     const ctx: GameContext = {
       get players() {
         return self.getPlayers();
       },
       pushState() {
-        for (const p of self.getPlayers()) {
-          self.transport.pushState(p.id, self.instance.getStateView(p.id));
-        }
-        // 관전자에게도 상태 전송 (게임 입장에서 players에 없는 id → 외부 관전 시점)
-        for (const specId of self.getSpectators()) {
-          self.transport.pushState(specId, self.instance.getStateView(specId));
-        }
+        for (const p of self.getPlayers()) pushOne(p.id);
+        for (const specId of self.getSpectators()) pushOne(specId); // 관전자에게도 전송
       },
       emit(event, payload) {
         self.transport.emitEvent(event, payload ?? null);
@@ -49,7 +53,7 @@ export class GameRuntime {
       setTimer(ms, cb) {
         const h = setTimeout(() => {
           self.timers.delete(h);
-          if (!self.ended) cb();
+          self.safe('timer', cb); // 페이즈 전환 콜백도 격리 (setTimeout 콜백의 예외는 프로세스 크래시)
         }, ms);
         self.timers.add(h);
         return h;
@@ -69,33 +73,62 @@ export class GameRuntime {
     this.instance = this.module.create(ctx);
   }
 
+  /** 게임 코드 실행을 감싸 예외 발생 시 해당 룸만 안전 종료 */
+  private safe(label: string, fn: () => void): void {
+    if (this.ended) return;
+    try {
+      fn();
+    } catch (e) {
+      console.error(`[game:${this.module.meta.id}] ${label} 예외 → 게임 종료:`, e);
+      this.fault();
+    }
+  }
+
+  private fault(): void {
+    if (this.ended) return;
+    this.ended = true;
+    this.dispose();
+    try {
+      this.onEnd({ rankings: [] }); // 결과 없이 룸을 대기 상태로 복구
+    } catch (e) {
+      console.error('[game] onEnd(fault) 예외:', e);
+    }
+  }
+
   start(): void {
-    this.instance.onStart();
+    this.safe('onStart', () => this.instance.onStart());
     if (this.instance.onTick && this.module.meta.mode === 'realtime') {
-      this.tick = setInterval(() => {
-        if (!this.ended) this.instance.onTick!(TICK_MS);
-      }, TICK_MS);
+      this.tick = setInterval(() => this.safe('onTick', () => this.instance.onTick!(TICK_MS)), TICK_MS);
     }
   }
 
   action(playerId: string, action: unknown): void {
-    if (!this.ended) this.instance.onAction(playerId, action);
+    this.safe('onAction', () => this.instance.onAction(playerId, action));
   }
 
   playerLeft(playerId: string): void {
-    if (!this.ended) this.instance.onPlayerLeave(playerId);
+    this.safe('onPlayerLeave', () => this.instance.onPlayerLeave(playerId));
   }
 
   /** 재접속한 플레이어에게 현재 상태 1회 재전송 */
   resyncPlayer(playerId: string): void {
-    if (!this.ended) this.transport.pushState(playerId, this.instance.getStateView(playerId));
+    if (this.ended) return;
+    try {
+      this.transport.pushState(playerId, this.instance.getStateView(playerId));
+    } catch (e) {
+      console.error(`[game:${this.module.meta.id}] resync(${playerId}) 예외:`, e);
+    }
   }
 
   private finish(result: GameResult): void {
     if (this.ended) return;
     this.ended = true;
     this.dispose();
-    this.onEnd(result);
+    try {
+      this.onEnd(result);
+    } catch (e) {
+      console.error('[game] onEnd 예외:', e);
+    }
   }
 
   dispose(): void {

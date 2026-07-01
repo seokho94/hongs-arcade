@@ -16,6 +16,7 @@ interface Session {
   socketId: string | null;
   roomId: string | null;
   spectating: boolean;
+  lastChatAt: number;
   graceTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -247,7 +248,7 @@ io.on('connection', (socket) => {
       session.nickname = nickname;
     } else {
       const id = randomUUID();
-      session = { id, nickname, socketId: socket.id, roomId: null, spectating: false, graceTimer: null };
+      session = { id, nickname, socketId: socket.id, roomId: null, spectating: false, lastChatAt: 0, graceTimer: null };
       sessions.set(id, session);
     }
     socket.data.sessionId = session.id;
@@ -447,8 +448,11 @@ io.on('connection', (socket) => {
     if (!session?.roomId) return;
     const r = rooms.get(session.roomId);
     if (!r) return;
+    const now = Date.now();
+    if (now - session.lastChatAt < 400) return; // 채팅 스팸 방지
     const text = String(data?.text ?? '').slice(0, 300).trim();
     if (!text) return;
+    session.lastChatAt = now;
     io.to(r.id).emit(EV.CHAT_MESSAGE, {
       playerId: session.id,
       nickname: session.nickname,
@@ -479,6 +483,10 @@ io.on('connection', (socket) => {
     }, GRACE_MS);
   });
 });
+
+// 전역 예외 핸들러: 예기치 못한 오류에도 서버 프로세스가 죽지 않도록
+process.on('uncaughtException', (e) => console.error('[uncaughtException]', e));
+process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));
 
 httpServer.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);

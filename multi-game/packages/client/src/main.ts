@@ -9,7 +9,7 @@ const SERVER_URL =
   (import.meta as { env?: Record<string, string> }).env?.VITE_SERVER_URL ??
   `http://${location.hostname || 'localhost'}:3000`;
 
-type Screen = 'login' | 'lobby' | 'room';
+type Screen = 'login' | 'lobby' | 'room' | 'result';
 
 const app = document.getElementById('app')!;
 const socket: Socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
@@ -95,7 +95,25 @@ function render(): void {
   if (inGame) return; // 게임 화면은 게임 클라이언트가 DOM을 소유
   if (screen === 'login') return renderLogin();
   if (screen === 'lobby') return renderLobby();
+  if (screen === 'result') return renderResultScreen();
   if (screen === 'room') return renderRoom();
+}
+
+/** 게임 종료 직후 스코어보드를 화면 전체에 즉시 노출 */
+function renderResultScreen(): void {
+  if (!lastResult) {
+    screen = room ? 'room' : 'lobby';
+    return render();
+  }
+  app.innerHTML = `
+    <div class="row"><h1 style="margin:0">🏁 결과</h1><div class="spacer"></div>
+      <button class="ghost" id="toroom">방으로 돌아가기</button></div>
+    ${renderResult(lastResult)}`;
+  app.querySelector('#toroom')!.addEventListener('click', () => {
+    lastResult = null;
+    screen = room ? 'room' : 'lobby';
+    render();
+  });
 }
 
 function renderLogin(): void {
@@ -216,7 +234,6 @@ function renderRoom(): void {
   const teamBadge = (t: number) => (t === 1 ? '<span class="badge team1">🔴</span>' : t === 2 ? '<span class="badge team2">🔵</span>' : '');
   app.innerHTML = `
     <h1>방 ${esc(room.id)} <span class="tag">${esc(room.gameName)}</span>${amSpectator ? ' <span class="tag">👁 관전</span>' : ''}</h1>
-    ${lastResult ? renderResult(lastResult) : ''}
     <div class="card">
       <div class="row"><h2 style="margin:0">참가자 (${room.players.length}/${room.capacity.max})</h2>
         <div class="spacer"></div>
@@ -430,7 +447,7 @@ function exitGame(result: GameResult): void {
   }
   teardownGame();
   lastResult = result;
-  screen = 'room';
+  screen = 'result'; // 종료 즉시 스코어보드 화면
   render();
 }
 
