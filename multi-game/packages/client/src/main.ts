@@ -23,7 +23,17 @@ let screen: Screen = 'login';
 let inGame = false;
 let lobby: LobbyData | null = null;
 let room: RoomDetail | null = null;
-let chatLog: { nickname: string; text: string; sys?: boolean }[] = [];
+type ChatEntry = { nickname: string; text: string; sys?: boolean };
+// 방 id별 채팅 로그. 방을 떠나거나 다른 방으로 전환하면 해당 로그를 삭제한다.
+const roomChats = new Map<string, ChatEntry[]>();
+function chatFor(roomId: string): ChatEntry[] {
+  let arr = roomChats.get(roomId);
+  if (!arr) {
+    arr = [];
+    roomChats.set(roomId, arr);
+  }
+  return arr;
+}
 let lastResult: GameResult | null = null;
 let amSpectator = false;
 
@@ -231,7 +241,7 @@ function renderRoom(): void {
     </div>
     <div class="card">
       <h2>채팅</h2>
-      <div class="chat-log" id="chatlog">${chatLog.map(chatLine).join('')}</div>
+      <div class="chat-log" id="chatlog">${(roomChats.get(room.id) ?? []).map(chatLine).join('')}</div>
       <div class="row" style="margin-top:10px">
         <input type="text" id="chatin" maxlength="300" placeholder="메시지 입력" />
         <button id="chatsend">전송</button>
@@ -241,6 +251,7 @@ function renderRoom(): void {
   app.querySelector('#ready')?.addEventListener('click', () => socket.emit(EV.ROOM_READY, { ready: !myReady }));
   app.querySelector('#leave')!.addEventListener('click', () => {
     socket.emit(EV.ROOM_LEAVE);
+    if (room) roomChats.delete(room.id); // 방을 떠나면 채팅 로그 삭제
     room = null;
     lastResult = null;
     amSpectator = false;
@@ -322,6 +333,7 @@ function enterGame(gameId: string, gameName: string): void {
   app.querySelector('#gleave')!.addEventListener('click', () => {
     socket.emit(EV.ROOM_LEAVE);
     teardownGame();
+    if (room) roomChats.delete(room.id); // 방을 떠나면 채팅 로그 삭제
     room = null;
     amSpectator = false;
     screen = 'lobby';
@@ -383,6 +395,7 @@ socket.on(EV.ROOM_ROLE, (data: { spectator?: boolean }) => {
 });
 
 socket.on(EV.ROOM_UPDATE, (data: RoomDetail) => {
+  if (room && room.id !== data.id) roomChats.delete(room.id); // 다른 방으로 전환 → 이전 방 채팅 삭제
   room = data;
   if (!inGame && (screen === 'lobby' || screen === 'room')) {
     screen = 'room';
@@ -393,6 +406,7 @@ socket.on(EV.ROOM_UPDATE, (data: RoomDetail) => {
 socket.on(EV.ROOM_CLOSED, (data: { reason: string }) => {
   toast(data.reason === 'kicked' ? '방에서 강퇴되었습니다.' : '방이 닫혔습니다.');
   teardownGame();
+  if (room) roomChats.delete(room.id); // 방이 닫히면 채팅 로그 삭제
   room = null;
   amSpectator = false;
   screen = 'lobby';
@@ -403,8 +417,10 @@ socket.on(EV.ROOM_CLOSED, (data: { reason: string }) => {
 });
 
 socket.on(EV.CHAT_MESSAGE, (m: ChatMessage) => {
-  chatLog.push({ nickname: m.nickname, text: m.text });
-  if (chatLog.length > 100) chatLog = chatLog.slice(-100);
+  if (!room) return; // 현재 방이 없으면 무시
+  const arr = chatFor(room.id);
+  arr.push({ nickname: m.nickname, text: m.text });
+  if (arr.length > 100) arr.splice(0, arr.length - 100); // 참조 유지한 채 100개로 제한
   if (screen === 'room' && !inGame) {
     const el = document.getElementById('chatlog');
     if (el) {
