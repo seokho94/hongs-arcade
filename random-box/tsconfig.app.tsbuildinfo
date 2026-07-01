@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/racescreen.tsx","./src/components/resultscreen.tsx","./src/components/setupscreen.tsx","./src/data/mockdirectory.ts","./src/game/race.ts","./src/hooks/userace.ts","./src/services/directory.ts"],"version":"5.7.3"}

@@ -1,0 +1,24 @@
+{
+  "name": "coffee-run",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "☕ 커피런 - 조직도 부서원들의 귀여운 캐릭터 경주, 꼴찌가 쏜다!",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5"
+  }
+}

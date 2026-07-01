@@ -1,0 +1,21 @@
+{
+  "name": "@mg/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mg/catch-mind": "workspace:*",
+    "@mg/nunchi": "workspace:*",
+    "@mg/game-sdk": "workspace:*",
+    "@mg/shared": "workspace:*",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.5"
+  }
+}
