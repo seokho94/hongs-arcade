@@ -23,6 +23,7 @@ interface Member {
   playerId: string;
   nickname: string;
   ready: boolean;
+  team: number; // 0=미배정/개인전, 1=레드, 2=블루
 }
 
 interface Room {
@@ -32,6 +33,7 @@ interface Room {
   hostId: string;
   members: Member[];
   spectators: string[]; // 관전자 세션 id
+  teamMode: boolean;
   phase: 'WAITING' | 'IN_GAME' | 'FINISHED';
   runtime: GameRuntime | null;
 }
@@ -99,14 +101,41 @@ function roomDetail(r: Room): RoomDetail {
       nickname: m.nickname,
       isHost: m.playerId === r.hostId,
       ready: m.ready,
+      team: m.team,
     })),
     spectatorCount: r.spectators.length,
+    teamMode: r.teamMode,
   };
 }
 
 function emitRole(session: Session): void {
   const sid = session.socketId;
   if (sid) io.to(sid).emit(EV.ROOM_ROLE, { spectator: session.spectating });
+}
+
+/** 멤버를 2팀으로 균등 분배 */
+function autoBalance(r: Room): void {
+  r.members.forEach((m, i) => {
+    m.team = (i % 2) + 1;
+  });
+}
+
+/** 개인 순위를 팀별로 합산해 팀 순위 생성 */
+function buildTeamResult(r: Room, rankings: { playerId: string; nickname: string; score: number }[]) {
+  const sums = new Map<number, { score: number; members: string[] }>();
+  for (const e of rankings) {
+    const team = r.members.find((m) => m.playerId === e.playerId)?.team ?? 0;
+    if (team === 0) continue;
+    const t = sums.get(team) ?? { score: 0, members: [] };
+    t.score += e.score;
+    t.members.push(e.nickname);
+    sums.set(team, t);
+  }
+  const names: Record<number, string> = { 1: '레드팀', 2: '블루팀' };
+  return [...sums.entries()]
+    .map(([team, v]) => ({ team, name: names[team] ?? `팀${team}`, score: v.score, members: v.members }))
+    .sort((a, b) => b.score - a.score)
+    .map((t, i) => ({ ...t, rank: i + 1 }));
 }
 
 function emitRoom(r: Room): void {
@@ -135,7 +164,7 @@ function startGame(r: Room): void {
   r.phase = 'IN_GAME';
   const runtime = new GameRuntime(
     mod,
-    () => r.members.map((m) => ({ id: m.playerId, nickname: m.nickname })),
+    () => r.members.map((m) => ({ id: m.playerId, nickname: m.nickname, team: r.teamMode ? m.team : undefined })),
     () => [...r.spectators],
     makeTransport(r.id),
     (result) => onGameEnd(r, result),
@@ -148,6 +177,7 @@ function startGame(r: Room): void {
 }
 
 function onGameEnd(r: Room, result: GameResult): void {
+  if (r.teamMode) result.teams = buildTeamResult(r, result.rankings); // 개인 점수를 팀별 합산
   io.to(r.id).emit(EV.GAME_END, { result });
   r.runtime?.dispose();
   r.runtime = null;
@@ -264,8 +294,9 @@ io.on('connection', (socket) => {
       gameId: mod.meta.id,
       meta: mod.meta,
       hostId: session.id,
-      members: [{ playerId: session.id, nickname: session.nickname, ready: false }],
+      members: [{ playerId: session.id, nickname: session.nickname, ready: false, team: 0 }],
       spectators: [],
+      teamMode: false,
       phase: 'WAITING',
       runtime: null,
     };
@@ -289,7 +320,8 @@ io.on('connection', (socket) => {
 
     if (session.roomId && session.roomId !== room.id) leaveRoom(session);
     if (!room.members.some((m) => m.playerId === session.id)) {
-      room.members.push({ playerId: session.id, nickname: session.nickname, ready: false });
+      const team = room.teamMode ? (room.members.filter((m) => m.team === 1).length <= room.members.filter((m) => m.team === 2).length ? 1 : 2) : 0;
+      room.members.push({ playerId: session.id, nickname: session.nickname, ready: false, team });
     }
     session.roomId = room.id;
     session.spectating = false;
@@ -342,6 +374,43 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 방장: 개인전/팀전 토글 (단체 게임만)
+  socket.on(EV.ROOM_TEAM_MODE, (data: { enabled?: boolean }) => {
+    const session = sessionOf(socket);
+    if (!session?.roomId) return;
+    const r = rooms.get(session.roomId);
+    if (!r || r.hostId !== session.id || r.phase !== 'WAITING' || !r.meta.supportsTeams) return;
+    r.teamMode = !!data?.enabled;
+    if (r.teamMode) autoBalance(r);
+    else r.members.forEach((m) => (m.team = 0));
+    emitRoom(r);
+  });
+
+  // 자기 팀 선택
+  socket.on(EV.ROOM_JOIN_TEAM, (data: { team?: number }) => {
+    const session = sessionOf(socket);
+    if (!session?.roomId) return;
+    const r = rooms.get(session.roomId);
+    if (!r || !r.teamMode || r.phase !== 'WAITING') return;
+    const team = Number(data?.team);
+    if (team !== 1 && team !== 2) return;
+    const m = r.members.find((x) => x.playerId === session.id);
+    if (m) {
+      m.team = team;
+      emitRoom(r);
+    }
+  });
+
+  // 방장: 자동 밸런스
+  socket.on(EV.ROOM_AUTO_BALANCE, () => {
+    const session = sessionOf(socket);
+    if (!session?.roomId) return;
+    const r = rooms.get(session.roomId);
+    if (!r || r.hostId !== session.id || !r.teamMode || r.phase !== 'WAITING') return;
+    autoBalance(r);
+    emitRoom(r);
+  });
+
   socket.on(EV.ROOM_START, (cb?: (res: unknown) => void) => {
     const session = sessionOf(socket);
     if (!session?.roomId) return cb?.({ ok: false, error: 'no-room' });
@@ -351,6 +420,11 @@ io.on('connection', (socket) => {
     if (r.phase !== 'WAITING') return cb?.({ ok: false, error: 'bad-phase' });
     if (r.members.length < r.meta.minPlayers) return cb?.({ ok: false, error: 'not-enough' });
     if (!r.members.every((m) => m.ready)) return cb?.({ ok: false, error: 'not-ready' });
+    if (r.teamMode) {
+      const t1 = r.members.filter((m) => m.team === 1).length;
+      const t2 = r.members.filter((m) => m.team === 2).length;
+      if (t1 < 1 || t2 < 1) return cb?.({ ok: false, error: 'teams-unbalanced' });
+    }
     cb?.({ ok: true });
     startGame(r);
   });

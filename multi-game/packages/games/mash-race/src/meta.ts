@@ -7,6 +7,7 @@ export const meta: GameMeta = {
   minPlayers: 2,
   maxPlayers: 8,
   mode: 'realtime',
+  supportsTeams: true,
 };
 
 export default meta;

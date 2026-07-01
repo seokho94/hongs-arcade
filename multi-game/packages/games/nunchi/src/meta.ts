@@ -7,6 +7,7 @@ export const meta: GameMeta = {
   minPlayers: 2, // 테스트 편의상 2명부터. 권장 4명 이상
   maxPlayers: 12,
   mode: 'realtime',
+  supportsTeams: true,
 };
 
 export default meta;

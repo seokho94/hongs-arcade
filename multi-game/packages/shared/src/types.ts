@@ -3,6 +3,8 @@
 export interface Player {
   id: string;
   nickname: string;
+  /** 팀전일 때만: 1=레드, 2=블루 (0/undefined=개인전) */
+  team?: number;
 }
 
 export type GameMode = 'turn' | 'realtime';
@@ -14,6 +16,8 @@ export interface GameMeta {
   minPlayers: number;
   maxPlayers: number;
   mode: GameMode;
+  /** 개인전/팀전 토글 지원 여부 (단체 게임만 true) */
+  supportsTeams?: boolean;
 }
 
 export type RoomPhase = 'WAITING' | 'IN_GAME' | 'FINISHED';
@@ -38,6 +42,7 @@ export interface RoomSummary {
 export interface RoomMemberView extends Player {
   isHost: boolean;
   ready: boolean;
+  team: number; // 0=미배정/개인전, 1=레드, 2=블루
 }
 
 /** 룸 안에 들어왔을 때 보이는 상세 */
@@ -50,6 +55,7 @@ export interface RoomDetail {
   phase: RoomPhase;
   players: RoomMemberView[];
   spectatorCount: number;
+  teamMode: boolean;
 }
 
 export interface LobbyData {
@@ -64,8 +70,18 @@ export interface RankingEntry {
   rank: number;
 }
 
+export interface TeamResult {
+  team: number; // 1=레드, 2=블루
+  name: string;
+  score: number;
+  rank: number;
+  members: string[]; // 닉네임
+}
+
 export interface GameResult {
   rankings: RankingEntry[];
+  /** 팀전일 때 코어가 개인 점수를 팀별로 합산해 채운다 */
+  teams?: TeamResult[];
 }
 
 export interface ChatMessage {

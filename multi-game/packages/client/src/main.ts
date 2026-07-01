@@ -66,6 +66,7 @@ const ERR_MSG: Record<string, string> = {
   'not-host': '방장만 할 수 있습니다.',
   'not-enough': '인원이 부족합니다.',
   'not-ready': '모든 인원이 준비되어야 합니다.',
+  'teams-unbalanced': '각 팀에 최소 1명이 필요합니다.',
   'unknown-game': '알 수 없는 게임입니다.',
 };
 
@@ -203,9 +204,16 @@ function renderRoom(): void {
   const amHost = room.hostId === me.id;
   const myReady = room.players.find((p) => p.id === me.id)?.ready ?? false;
   const allReady = room.players.length > 0 && room.players.every((p) => p.ready);
-  const canStart = amHost && room.players.length >= room.capacity.min && allReady;
+  const supportsTeams = !!getClientGame(room.gameId)?.meta.supportsTeams;
+  const teamMode = room.teamMode;
+  const myTeam = room.players.find((p) => p.id === me.id)?.team ?? 0;
+  const t1 = room.players.filter((p) => p.team === 1).length;
+  const t2 = room.players.filter((p) => p.team === 2).length;
+  const teamsOk = !teamMode || (t1 >= 1 && t2 >= 1);
+  const canStart = amHost && room.players.length >= room.capacity.min && allReady && teamsOk;
 
   const specCount = room.spectatorCount ?? 0;
+  const teamBadge = (t: number) => (t === 1 ? '<span class="badge team1">🔴</span>' : t === 2 ? '<span class="badge team2">🔵</span>' : '');
   app.innerHTML = `
     <h1>방 ${esc(room.id)} <span class="tag">${esc(room.gameName)}</span>${amSpectator ? ' <span class="tag">👁 관전</span>' : ''}</h1>
     ${lastResult ? renderResult(lastResult) : ''}
@@ -213,11 +221,28 @@ function renderRoom(): void {
       <div class="row"><h2 style="margin:0">참가자 (${room.players.length}/${room.capacity.max})</h2>
         <div class="spacer"></div>
         <span class="muted">${specCount > 0 ? `👁 관전 ${specCount}명 · ` : ''}최소 ${room.capacity.min}명</span></div>
+      ${
+        supportsTeams && !amSpectator
+          ? `<div class="row wrap" style="margin-top:10px">
+              <span class="muted">모드: <b>${teamMode ? '팀전 🔴 vs 🔵' : '개인전'}</b></span>
+              ${amHost ? `<button class="ghost" id="teamtoggle">${teamMode ? '개인전으로' : '팀전으로'}</button>` : ''}
+              ${
+                teamMode
+                  ? `<div class="spacer"></div><span class="muted">내 팀:</span>
+                     <button class="ghost ${myTeam === 1 ? 'on' : ''}" data-team="1">🔴 레드 ${t1}</button>
+                     <button class="ghost ${myTeam === 2 ? 'on' : ''}" data-team="2">🔵 블루 ${t2}</button>
+                     ${amHost ? `<button class="ghost" id="autobal">🔀 자동</button>` : ''}`
+                  : ''
+              }
+            </div>`
+          : ''
+      }
       <div class="list" style="margin-top:12px">
         ${room.players
           .map(
             (p) => `
           <div class="list-item">
+            ${teamMode ? teamBadge(p.team) : ''}
             <strong>${esc(p.nickname)}</strong>
             ${p.isHost ? '<span class="badge host">방장</span>' : ''}
             ${p.ready ? '<span class="badge ready">준비완료</span>' : '<span class="badge">대기</span>'}
@@ -237,7 +262,7 @@ function renderRoom(): void {
         <div class="spacer"></div>
         <button id="leave" class="danger ghost">${amSpectator ? '관전 종료' : '방 나가기'}</button>
       </div>
-      ${!amSpectator && amHost && !canStart ? `<p class="muted" style="margin-top:8px">시작 조건: ${room.capacity.min}명 이상 + 전원 준비완료</p>` : ''}
+      ${!amSpectator && amHost && !canStart ? `<p class="muted" style="margin-top:8px">시작 조건: ${room.capacity.min}명 이상 + 전원 준비완료${teamMode ? ' + 각 팀 1명 이상' : ''}</p>` : ''}
     </div>
     <div class="card">
       <h2>채팅</h2>
@@ -267,6 +292,11 @@ function renderRoom(): void {
   });
   app.querySelectorAll<HTMLElement>('[data-kick]').forEach((b) =>
     b.addEventListener('click', () => socket.emit(EV.ROOM_KICK, { playerId: b.dataset.kick })),
+  );
+  app.querySelector('#teamtoggle')?.addEventListener('click', () => socket.emit(EV.ROOM_TEAM_MODE, { enabled: !teamMode }));
+  app.querySelector('#autobal')?.addEventListener('click', () => socket.emit(EV.ROOM_AUTO_BALANCE));
+  app.querySelectorAll<HTMLElement>('[data-team]').forEach((b) =>
+    b.addEventListener('click', () => socket.emit(EV.ROOM_JOIN_TEAM, { team: Number(b.dataset.team) })),
   );
   const chatin = app.querySelector<HTMLInputElement>('#chatin')!;
   const send = () => {
@@ -306,6 +336,30 @@ function renderResult(result: GameResult): string {
     )
     .join('');
   const champ = result.rankings.find((r) => r.rank === 1);
+
+  if (result.teams && result.teams.length) {
+    const teamRows = result.teams
+      .map((t) => {
+        const icon = t.team === 1 ? '🔴' : '🔵';
+        return `<div class="ro-rank r${t.rank}">
+          <span class="ro-pos">${t.rank === 1 ? 'WIN' : `${t.rank}위`}</span>
+          <span class="ro-name">${icon} ${esc(t.name)} <span class="muted" style="font-size:12px">(${t.members.map(esc).join(', ')})</span></span>
+          <span class="ro-score">${String(t.score).padStart(5, '0')}</span>
+        </div>`;
+      })
+      .join('');
+    const win = result.teams[0];
+    return `
+    <div class="result-overlay crt-on">
+      <div class="ro-title">GAME OVER</div>
+      <div class="ro-sub">— TEAM RESULT —</div>
+      <div class="ro-list">${teamRows}</div>
+      ${win ? `<div class="ro-champ">★ WINNER ★ ${win.team === 1 ? '🔴' : '🔵'} ${esc(win.name)}</div>` : ''}
+      <div class="ro-sub" style="margin-top:16px">개인 기록</div>
+      <div class="ro-list">${rows}</div>
+    </div>`;
+  }
+
   return `
     <div class="result-overlay crt-on">
       <div class="ro-title">GAME OVER</div>
