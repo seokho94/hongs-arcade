@@ -22,6 +22,7 @@ export class GameRuntime {
   constructor(
     private readonly module: GameModule,
     private readonly getPlayers: () => Player[],
+    private readonly getSpectators: () => string[],
     private readonly transport: RuntimeTransport,
     private readonly onEnd: (result: GameResult) => void,
   ) {
@@ -33,6 +34,10 @@ export class GameRuntime {
       pushState() {
         for (const p of self.getPlayers()) {
           self.transport.pushState(p.id, self.instance.getStateView(p.id));
+        }
+        // 관전자에게도 상태 전송 (게임 입장에서 players에 없는 id → 외부 관전 시점)
+        for (const specId of self.getSpectators()) {
+          self.transport.pushState(specId, self.instance.getStateView(specId));
         }
       },
       emit(event, payload) {

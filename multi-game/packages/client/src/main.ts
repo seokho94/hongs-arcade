@@ -25,6 +25,7 @@ let lobby: LobbyData | null = null;
 let room: RoomDetail | null = null;
 let chatLog: { nickname: string; text: string; sys?: boolean }[] = [];
 let lastResult: GameResult | null = null;
+let amSpectator = false;
 
 let game: { client: GameClient; mount: HTMLElement } | null = null;
 
@@ -136,18 +137,26 @@ function renderLobby(): void {
         ${
           rooms.length === 0
             ? '<p class="muted">아직 열린 방이 없습니다. 새 방을 만들어 보세요.</p>'
-            : rooms
-                .map(
-                  (r) => `
+            : [...rooms]
+                .sort((a, b) => (a.phase === 'WAITING' ? 0 : 1) - (b.phase === 'WAITING' ? 0 : 1))
+                .map((r) => {
+                  const canJoin = r.phase === 'WAITING' && r.playerCount < r.capacity.max;
+                  const live = r.phase !== 'WAITING';
+                  return `
           <div class="list-item">
             <span class="tag">${esc(r.gameName)}</span>
             <strong>방 ${esc(r.id)}</strong>
             <span class="muted">${r.playerCount}/${r.capacity.max}명</span>
-            <span class="badge">${r.phase === 'WAITING' ? '대기중' : '게임중'}</span>
+            ${r.spectatorCount > 0 ? `<span class="badge">👁 ${r.spectatorCount}</span>` : ''}
+            <span class="badge ${live ? 'live' : ''}">${live ? '게임중' : '대기중'}</span>
             <div class="spacer"></div>
-            <button data-join="${r.id}" ${r.phase !== 'WAITING' || r.playerCount >= r.capacity.max ? 'disabled' : ''}>입장</button>
-          </div>`,
-                )
+            ${
+              canJoin
+                ? `<button data-join="${r.id}">입장</button>`
+                : `<button class="ghost" data-spectate="${r.id}">👁 관전</button>`
+            }
+          </div>`;
+                })
                 .join('')
         }
       </div>
@@ -165,6 +174,12 @@ function renderLobby(): void {
       if (!res.ok) toast(ERR_MSG[res.error ?? ''] ?? '입장 실패');
     }),
   );
+  app.querySelectorAll<HTMLElement>('[data-spectate]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const res = await emit<{ ok: boolean; error?: string }>(EV.ROOM_SPECTATE, { roomId: b.dataset.spectate });
+      if (!res.ok) toast(ERR_MSG[res.error ?? ''] ?? '관전할 수 없습니다.');
+    }),
+  );
   app.querySelector('#refresh')!.addEventListener('click', () => {
     void emit<LobbyData>(EV.LOBBY_LIST).then((d) => {
       lobby = d;
@@ -180,13 +195,14 @@ function renderRoom(): void {
   const allReady = room.players.length > 0 && room.players.every((p) => p.ready);
   const canStart = amHost && room.players.length >= room.capacity.min && allReady;
 
+  const specCount = room.spectatorCount ?? 0;
   app.innerHTML = `
-    <h1>방 ${esc(room.id)} <span class="tag">${esc(room.gameName)}</span></h1>
+    <h1>방 ${esc(room.id)} <span class="tag">${esc(room.gameName)}</span>${amSpectator ? ' <span class="tag">👁 관전</span>' : ''}</h1>
     ${lastResult ? renderResult(lastResult) : ''}
     <div class="card">
       <div class="row"><h2 style="margin:0">참가자 (${room.players.length}/${room.capacity.max})</h2>
         <div class="spacer"></div>
-        <span class="muted">최소 ${room.capacity.min}명</span></div>
+        <span class="muted">${specCount > 0 ? `👁 관전 ${specCount}명 · ` : ''}최소 ${room.capacity.min}명</span></div>
       <div class="list" style="margin-top:12px">
         ${room.players
           .map(
@@ -196,18 +212,22 @@ function renderRoom(): void {
             ${p.isHost ? '<span class="badge host">방장</span>' : ''}
             ${p.ready ? '<span class="badge ready">준비완료</span>' : '<span class="badge">대기</span>'}
             <div class="spacer"></div>
-            ${amHost && p.id !== me.id ? `<button class="danger ghost" data-kick="${p.id}">강퇴</button>` : ''}
+            ${!amSpectator && amHost && p.id !== me.id ? `<button class="danger ghost" data-kick="${p.id}">강퇴</button>` : ''}
           </div>`,
           )
           .join('')}
       </div>
       <div class="row wrap" style="margin-top:16px">
-        <button id="ready" class="${myReady ? 'ghost' : ''}">${myReady ? '준비 취소' : '준비'}</button>
-        ${amHost ? `<button id="start" ${canStart ? '' : 'disabled'}>게임 시작</button>` : ''}
+        ${
+          amSpectator
+            ? '<span class="badge">👁 관전 중 — 이 방을 지켜보는 중입니다</span>'
+            : `<button id="ready" class="${myReady ? 'ghost' : ''}">${myReady ? '준비 취소' : '준비'}</button>
+        ${amHost ? `<button id="start" ${canStart ? '' : 'disabled'}>게임 시작</button>` : ''}`
+        }
         <div class="spacer"></div>
-        <button id="leave" class="danger ghost">방 나가기</button>
+        <button id="leave" class="danger ghost">${amSpectator ? '관전 종료' : '방 나가기'}</button>
       </div>
-      ${amHost && !canStart ? `<p class="muted" style="margin-top:8px">시작 조건: ${room.capacity.min}명 이상 + 전원 준비완료</p>` : ''}
+      ${!amSpectator && amHost && !canStart ? `<p class="muted" style="margin-top:8px">시작 조건: ${room.capacity.min}명 이상 + 전원 준비완료</p>` : ''}
     </div>
     <div class="card">
       <h2>채팅</h2>
@@ -218,11 +238,12 @@ function renderRoom(): void {
       </div>
     </div>`;
 
-  app.querySelector('#ready')!.addEventListener('click', () => socket.emit(EV.ROOM_READY, { ready: !myReady }));
+  app.querySelector('#ready')?.addEventListener('click', () => socket.emit(EV.ROOM_READY, { ready: !myReady }));
   app.querySelector('#leave')!.addEventListener('click', () => {
     socket.emit(EV.ROOM_LEAVE);
     room = null;
     lastResult = null;
+    amSpectator = false;
     screen = 'lobby';
     void emit<LobbyData>(EV.LOBBY_LIST).then((d) => {
       lobby = d;
@@ -293,13 +314,16 @@ function enterGame(gameId: string, gameName: string): void {
   lastResult = null;
   inGame = true;
   app.innerHTML = `
-    <div class="row"><h1 style="margin:0">${esc(gameName)}</h1><div class="spacer"></div>
-      <button class="danger ghost" id="gleave">나가기</button></div>
-    <div class="card crt-on"><div id="game-mount"></div></div>`;
+    <div class="row"><h1 style="margin:0">${esc(gameName)}</h1>
+      ${amSpectator ? '<span class="tag" style="margin-left:8px">👁 관전 중</span>' : ''}
+      <div class="spacer"></div>
+      <button class="danger ghost" id="gleave">${amSpectator ? '관전 종료' : '나가기'}</button></div>
+    <div class="card crt-on ${amSpectator ? 'spectating' : ''}"><div id="game-mount"></div></div>`;
   app.querySelector('#gleave')!.addEventListener('click', () => {
     socket.emit(EV.ROOM_LEAVE);
     teardownGame();
     room = null;
+    amSpectator = false;
     screen = 'lobby';
     void emit<LobbyData>(EV.LOBBY_LIST).then((d) => {
       lobby = d;
@@ -354,6 +378,10 @@ socket.on(EV.LOBBY_UPDATE, (data: LobbyData) => {
   if (screen === 'lobby' && !inGame) render();
 });
 
+socket.on(EV.ROOM_ROLE, (data: { spectator?: boolean }) => {
+  amSpectator = !!data?.spectator;
+});
+
 socket.on(EV.ROOM_UPDATE, (data: RoomDetail) => {
   room = data;
   if (!inGame && (screen === 'lobby' || screen === 'room')) {
@@ -366,6 +394,7 @@ socket.on(EV.ROOM_CLOSED, (data: { reason: string }) => {
   toast(data.reason === 'kicked' ? '방에서 강퇴되었습니다.' : '방이 닫혔습니다.');
   teardownGame();
   room = null;
+  amSpectator = false;
   screen = 'lobby';
   void emit<LobbyData>(EV.LOBBY_LIST).then((d) => {
     lobby = d;

@@ -30,6 +30,7 @@ export interface RoomSummary {
   gameName: string;
   hostId: string;
   playerCount: number;
+  spectatorCount: number;
   capacity: Capacity;
   phase: RoomPhase;
 }
@@ -48,6 +49,7 @@ export interface RoomDetail {
   capacity: Capacity;
   phase: RoomPhase;
   players: RoomMemberView[];
+  spectatorCount: number;
 }
 
 export interface LobbyData {

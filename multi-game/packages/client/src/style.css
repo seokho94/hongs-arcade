@@ -149,6 +149,16 @@ input[type="text"]::placeholder { color: #5b5b8a; }
 }
 .badge.host { border-color: var(--yellow); color: var(--yellow); text-shadow: 0 0 6px rgba(255, 229, 0, 0.5); }
 .badge.ready { border-color: var(--green); color: var(--green); text-shadow: 0 0 6px rgba(61, 255, 136, 0.5); }
+.badge.live { border-color: var(--magenta); color: var(--magenta); text-shadow: 0 0 6px rgba(255, 46, 151, 0.5); animation: blink 1.3s steps(1) infinite; }
+
+/* 관전 모드: 게임 화면 입력 차단 */
+.card.spectating { position: relative; }
+.card.spectating #game-mount { pointer-events: none; }
+.card.spectating::after {
+  content: "👁 SPECTATING"; position: absolute; top: 10px; right: 14px; z-index: 5;
+  font-family: var(--pixel); font-size: 9px; color: var(--magenta);
+  text-shadow: 0 0 8px var(--magenta); pointer-events: none; opacity: 0.85;
+}
 .tag {
   font-family: var(--pixel); font-size: 9px; padding: 4px 8px; border-radius: 6px;
   background: rgba(255, 46, 151, 0.12); color: var(--magenta); border: 1px solid var(--magenta);

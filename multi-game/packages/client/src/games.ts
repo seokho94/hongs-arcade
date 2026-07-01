@@ -3,11 +3,13 @@ import type { GameClientModule } from '@mg/game-sdk/client';
 import catchMind from '@mg/catch-mind/client';
 import nunchi from '@mg/nunchi/client';
 import speedQuiz from '@mg/speed-quiz/client';
+import omok from '@mg/omok/client';
 
 export const clientRegistry: Record<string, GameClientModule> = {
   [catchMind.meta.id]: catchMind,
   [nunchi.meta.id]: nunchi,
   [speedQuiz.meta.id]: speedQuiz,
+  [omok.meta.id]: omok,
 };
 
 export function getClientGame(id: string): GameClientModule | undefined {

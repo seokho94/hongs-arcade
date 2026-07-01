@@ -26,6 +26,9 @@ importers:
       '@mg/nunchi':
         specifier: workspace:*
         version: link:../games/nunchi
+      '@mg/omok':
+        specifier: workspace:*
+        version: link:../games/omok
       '@mg/shared':
         specifier: workspace:*
         version: link:../shared
@@ -64,6 +67,15 @@ importers:
         specifier: workspace:*
         version: link:../../shared
 
+  packages/games/omok:
+    dependencies:
+      '@mg/game-sdk':
+        specifier: workspace:*
+        version: link:../../game-sdk
+      '@mg/shared':
+        specifier: workspace:*
+        version: link:../../shared
+
   packages/games/speed-quiz:
     dependencies:
       '@mg/game-sdk':
@@ -84,6 +96,9 @@ importers:
       '@mg/nunchi':
         specifier: workspace:*
         version: link:../games/nunchi
+      '@mg/omok':
+        specifier: workspace:*
+        version: link:../games/omok
       '@mg/shared':
         specifier: workspace:*
         version: link:../shared

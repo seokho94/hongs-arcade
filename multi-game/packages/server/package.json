@@ -11,6 +11,7 @@
     "@mg/catch-mind": "workspace:*",
     "@mg/nunchi": "workspace:*",
     "@mg/speed-quiz": "workspace:*",
+    "@mg/omok": "workspace:*",
     "@mg/game-sdk": "workspace:*",
     "@mg/shared": "workspace:*",
     "socket.io": "^4.8.1"
